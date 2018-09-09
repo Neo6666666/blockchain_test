@@ -86,7 +86,7 @@ def get_balance(patricipant):
     open_tx_sender = [tx['amount'] for tx in open_transactions if tx['sender'] == patricipant]
     tx_sender.append(open_tx_sender)
     amount_sent = reduce(lambda x, y: x + sum(y) if len(y) > 0 else x + 0, tx_sender, 0)
-    #amount_sent =  0 if not reduce(sum, tx_sender) else reduce(sum, tx_sender)[0]
+    #amount_sent =  0 if not reduce(sum, tx_sender) else reduce(sum, tx_sender)[0] TODO REMOVE THIS!
 
     tx_recipient = [[tx['amount'] for tx in block['transactions'] if tx['recipient'] == patricipant] for block in blockchain]
     amount_recived = reduce(lambda x, y: x + sum(y) if len(y) > 0 else x + 0, tx_recipient, 0)
