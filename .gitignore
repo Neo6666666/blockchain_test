@@ -1,3 +1,4 @@
 .vscode/settings.json
 __pycache__/hash_util.cpython-36.pyc
 __pycache__/hash_util.cpython-37.pyc
+__pycache__/*
