@@ -9,3 +9,11 @@ class Block:
         self.transactions = transactions
         self.proof = proof
         self.timestamp = time
+
+    def __repr__(self):
+            return 'Block by index {}, hash {} and proof {}. Transactions is {}'.format(
+                self.index, 
+                self.previous_hash, 
+                self.proof, 
+                self.transactions
+            )
