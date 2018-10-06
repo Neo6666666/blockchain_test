@@ -2,10 +2,10 @@ import json
 from functools import reduce
 from collections import OrderedDict
 
-from hash_util import hash_block
+from utility.hash_util import hash_block
+from utility.verification import Verification
 from block import Block
 from transaction import Transaction
-from verification import Verification
 
 
 MINIG_REWARD = 10
@@ -18,14 +18,19 @@ class Blockchain:
         # Initialize first block
         genesis_block = Block(0, '', [], 100, 0)
         # Initializing empty blockchain list
-        self.__chain = [genesis_block,]
+        self.chain = [genesis_block,]
         # Unhandled transactions
         self.__open_transactions = []
         self.load_data()
         self.host_node_id = node_id
 
-    def get_chain(self):
+    @property
+    def chain(self):
         return self.__chain[:]
+    
+    @chain.setter
+    def chain(self, val):
+        self.__chain = val
 
     def get_open_transactions(self):
         return self.__open_transactions[:]
@@ -57,7 +62,7 @@ class Blockchain:
 
                     updated_blockchain.append(updated_block)
 
-                self.__chain = updated_blockchain
+                self.chain = updated_blockchain
 
                 open_transactions = json.loads(file_content[1])
 
