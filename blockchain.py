@@ -6,6 +6,7 @@ from utility.hash_util import hash_block
 from utility.verification import Verification
 from block import Block
 from transaction import Transaction
+from wallet import Wallet
 
 
 MINIG_REWARD = 10
@@ -21,8 +22,9 @@ class Blockchain:
         self.chain = [genesis_block,]
         # Unhandled transactions
         self.__open_transactions = []
-        self.load_data()
         self.host_node_id = node_id
+        self.__peer_nodes = set()
+        self.load_data()
 
     @property
     def chain(self):
@@ -34,6 +36,24 @@ class Blockchain:
 
     def get_open_transactions(self):
         return self.__open_transactions[:]
+    
+    def add_peer_node(self, node):
+        """Add node to the peer set.
+        Arguments: 
+                    node - node URL with will be added."""
+        self.__peer_nodes.add(node)
+        self.save_data()
+    
+    def remove_peer_node(self, node):
+        """Remove node to the peer set.
+        Arguments: 
+                    node - node URL with will be removed."""
+        self.__peer_nodes.discard(node)
+        self.save_data()
+
+    def get_peeer_nodes(self):
+        """Return list of all connected peer nodes."""
+        return list(self.__peer_nodes)
 
     def load_data(self):
         try:
@@ -48,6 +68,7 @@ class Blockchain:
                         updated_transactions.append(Transaction(
                             tx['sender'],
                             tx['recipient'],
+                            tx['signature'],
                             tx['amount']
                         ))
 
@@ -64,17 +85,20 @@ class Blockchain:
 
                 self.chain = updated_blockchain
 
-                open_transactions = json.loads(file_content[1])
+                open_transactions = json.loads(file_content[1][:-1])
 
                 updated_open_transactions = list()
                 for tx in open_transactions:
                     updated_open_transactions.append(Transaction(
                         tx['sender'],
                         tx['recipient'],
+                        tx['signature'],
                         tx['amount']
                     ))
 
-                self.open_transactions = updated_open_transactions
+                self.__open_transactions = updated_open_transactions
+                peer_nodes = json.loads(file_content[2])
+                self.__peer_nodes = set(peer_nodes)
         except (IOError, IndexError):
             print("Error hapens while loading! No blockchain file or wrong chain of blocks.")
 
@@ -92,9 +116,12 @@ class Blockchain:
                 f.flush()
                 f.write('\n')
                 f.flush()
-                saveable_tx = [tx.__dict__ for tx in self.open_transactions]
+                saveable_tx = [tx.__dict__ for tx in self.__open_transactions]
                 f.write(json.dumps(saveable_tx))
                 f.flush()
+                f.write('\n')
+                f.flush()
+                f.write(json.dumps(list(self.__peer_nodes))
         except IOError:
             print('Saving error.')
     
@@ -102,16 +129,20 @@ class Blockchain:
         last_blockchain = self.__chain[-1]
         last_hash = hash_block(last_blockchain)
         proof = 0
-        while not Verification.valid_proof(self.open_transactions, last_hash, proof):
+        while not Verification.valid_proof(self.__open_transactions, last_hash, proof):
             proof += 1
         return proof
 
     def get_balance(self):
         """Return balance of hosted node."""
+        
+        if self.host_node_id == None:
+            return None
+
         patricipant = self.host_node_id
         
         tx_sender = [[tx.amount for tx in block.transactions if tx.sender == patricipant] for block in self.__chain]
-        open_tx_sender = [tx.amount for tx in self.open_transactions if tx.sender == patricipant]
+        open_tx_sender = [tx.amount for tx in self.__open_transactions if tx.sender == patricipant]
         tx_sender.append(open_tx_sender)
         amount_sent = reduce(lambda x, y: x + sum(y) if len(y) > 0 else x + 0, tx_sender, 0)
 
@@ -125,40 +156,53 @@ class Blockchain:
             return None
         return self.__chain[-1]
 
-    def add_transaction(self, recipient, sender, amount=0.0):
+    def add_transaction(self, recipient, sender, signature, amount=0.0):
         """Append a new value as well as the last blockchain value to the blockchain.
         Params:
             -sender: sender of the coins
             -recipient: recipient of the coins 
             -amount: amount of the coins     
         """
+        if self.host_node_id == None:
+            return False
+        
         transaction = Transaction(
             sender,
             recipient,
+            signature,
             amount
         )
 
         if Verification.verify_transaction(transaction, self.get_balance):
-            self.open_transactions.append(transaction)
+            self.__open_transactions.append(transaction)
             self.save_data()
             return True
+        print("not valid")
         return False
 
     def mine_block(self):
         """Mine new block."""
+        if self.host_node_id == None:
+            return None
+        
         last_block = self.__chain[-1]
         hashed_block = hash_block(last_block)
         proof = self.proof_of_work()
-        reward_transaction = Transaction('MINING', self.host_node_id, MINIG_REWARD)
+        reward_transaction = Transaction('MINING', self.host_node_id, '', MINIG_REWARD)
 
-        copy_open_transactions = self.open_transactions[:]
+        copy_open_transactions = self.__open_transactions[:]
+
+        for tx in copy_open_transactions:
+            if not Wallet.verify_transaction(tx):
+                return None
+
         copy_open_transactions.append(reward_transaction)
         block = Block(len(self.__chain), hashed_block, copy_open_transactions, proof)
 
         self.__chain.append(block)
-        self.open_transactions = []
+        self.__open_transactions = []
         self.save_data()
-        return True
+        return block
 
 
 
